@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "video-processsing"
+version = "0.1.0"
+description = ""
+authors = ["Lblackhurst29 <l.blackhurst19@imperial.ac.uk>"]
+readme = "README.md"
+packages = [{include = "video_processsing"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pandas = "^2.0.0"
+numpy = "^1.24.2"
+scipy = "^1.10.1"
+tensorflow = "^2.12.0"
+opencv-python = "^4.7.0.72"
+sklearn = "^0.0.post1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
