@@ -7,11 +7,11 @@ def remove_background(video_path):
     fgbg = cv2.createBackgroundSubtractorMOG2()
 
     # Define codec for output video
-    fourcc = cv2.VideoWriter_fourcc(*'H264')
+    fourcc = cv2.VideoWriter_fourcc(*'XVID') #(*'DIVX')
 
     # Set up output video file
-    out_path = r'C:\Users\lab\Documents\Projects\hd_videos\output.mp4'
-    print(cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    out_path = '/home/lab/Desktop/video_processing/data/processed_video/output.mp4'
+    # print(cap.get(cv2.CAP_PROP_FPS), int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     out = cv2.VideoWriter(out_path, fourcc, cap.get(cv2.CAP_PROP_FPS), (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
 
     while True:
@@ -19,7 +19,6 @@ def remove_background(video_path):
 
         if not ret:
             break
-
 
         # Apply background subtraction
         fgmask = fgbg.apply(frame)
@@ -41,7 +40,6 @@ def remove_background(video_path):
     return out_path
 
 
-video_path = r'C:\Users\lab\Documents\Projects\hd_videos\short_test.mp4'
-
+video_path = '/home/lab/Documents/all_vids/HD_vids/11_05_23_21-28-15.mkv'
 new_vid = remove_background(video_path)
-# print(new_vid)
+print(new_vid)

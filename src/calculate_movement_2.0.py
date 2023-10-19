@@ -2,21 +2,16 @@ import cv2
 import os
 import numpy as np
 
-# contour_list = []
-# frame_count_list = []
-
 # Function to detect motion in a frame
 def is_motion(frames, threshold):
 
     motion = []
     contours_med = []
-
     for frame in frames:
         # converts the current frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # applies a Gaussian blur to the grayscale frame, helps reduce noise and minor variations in pixel values 
         gray = cv2.GaussianBlur(gray, (21, 21), 0)
-        
         # when first iteration return false
         if is_motion.previous_frame is None:
             is_motion.previous_frame = gray
@@ -30,32 +25,47 @@ def is_motion(frames, threshold):
         thresh = cv2.dilate(thresh, None, iterations=2)
         contours, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) # cv2.RETR_EXTERNAL
 
-        for contour in contours:
-            # print([cv2.contourArea(contour)])
-            contours_med.append(cv2.contourArea(contour))
-            if cv2.contourArea(contour) > threshold:
-                # draws a rectangle around the area of movement
-                # (x, y, w, h) = cv2.boundingRect(contour)
-                # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                motion.append(True)
+        if len(contours) == 0:
+            contours_med.append(0)
+        else:
+            tmp_contours = []
+            for contour in contours:
+                tmp_contours.append(cv2.contourArea(contour))
+            contours_med.append(np.mean(tmp_contours))
+                # print([cv2.contourArea(contour)])
+                # contours_med.append(cv2.contourArea(contour))
+                # if cv2.contourArea(contour) > threshold:
+                    # draws a rectangle around the area of movement
+                    # (x, y, w, h) = cv2.boundingRect(contour)
+                    # cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    # motion.append(True)
 
     is_motion.previous_frame = gray
 
     if len(contours_med) == 0:
-        return False
+        return False, contours_med
     else:
         # print(np.median(contours_med))
         # print(contours_med)
         if np.median(contours_med) > threshold:
-            return True
+            return True, contours_med
         else:
-            return False
+            return False, contours_med
 
 is_motion.previous_frame = None
 
 # Function to segment the video into mobile and immobile parts
+
 def segment_video(input_file, threshold, output, typ):
-    video_capture = cv2.VideoCapture(input_file)
+
+    file_list = []
+    for filename in os.listdir(input_file):
+        f = os.path.join(input_file, filename)
+        if f.endswith('.mkv'):
+            file_list.append(f)
+    file_list.sort()
+
+    video_capture = cv2.VideoCapture(file_list[0])
     fps = video_capture.get(cv2.CAP_PROP_FPS)
 
     frame_width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -68,23 +78,29 @@ def segment_video(input_file, threshold, output, typ):
     interval_frames = int(interval_seconds * fps)
 
     video_writer = None
-    
+    file_index = 0
     frames = []
     frame_count = 0
     count = 1
 
     type_frames = [True]
+    contours_all = []
 
     while True:
         ret, frame = video_capture.read()
         if not ret:
-            break
-        
+            try:
+                file_index += 1
+                video_capture.release()
+                video_capture = cv2.VideoCapture(file_list[file_index])
+                continue
+            except IndexError:
+                break
         frames.append(frame)
         frame_count += 1
-
         if frame_count == interval_frames:
-            motion_detected = is_motion(frames, threshold)
+            motion_detected, contours_lst = is_motion(frames, threshold)
+            contours_all.append(contours_lst)
             if motion_detected == True:
                 clss = 'mobile'
                 type_frames.append(True)
@@ -94,9 +110,10 @@ def segment_video(input_file, threshold, output, typ):
             
             if  len(type_frames) == 2 or type_frames[-1] != type_frames[-2]:
                 if video_writer is not None:
-                    video_writer.release()    
-                print(f"{output}/{typ}_{count}_{clss}_{os.path.basename(input_file)}")
-                video_writer = cv2.VideoWriter(f"{output}/{typ}_{count}_{clss}_{os.path.basename(input_file)}", 
+                    video_writer.release()
+                # print('video creaed')
+                # print(f"{output}/{typ}_{count}_{clss}_{os.path.basename(input_file)}")
+                video_writer = cv2.VideoWriter(f"{output}/{count}_{clss}_{typ}.mkv", 
                                                         cv2.VideoWriter_fourcc(*'mp4v'), 
                                                         fps, (frame_width, frame_height))
                 count += 1
@@ -110,61 +127,29 @@ def segment_video(input_file, threshold, output, typ):
     video_capture.release()
     if video_writer is not None:
         video_writer.release()
+    contours_all = [item for sublist in contours_all for item in sublist]
+    np.savetxt(f'{output}/contours_{typ}.txt', np.array(contours_all))
 
-def get_vid_length(input):
-    video = cv2.VideoCapture(input)
-    fps = video.get(cv2.CAP_PROP_FPS)
-    frame_count = video.get(cv2.CAP_PROP_FRAME_COUNT)
-    
-    vid_len = (frame_count / fps) / 60
-    if vid_len < 4.5:
-        os.remove(input)
+VID_LEN = 4.8
+
+def get_vid_length(folder):
+    for filename in os.listdir(folder):
+        f = os.path.join(folder, filename)
+        if f.endswith('.mkv'):
+            video = cv2.VideoCapture(f)
+            fps = video.get(cv2.CAP_PROP_FPS)
+            frame_count = video.get(cv2.CAP_PROP_FRAME_COUNT)
+            
+            vid_len = (frame_count / int(fps)) / 60
+            if vid_len < VID_LEN:
+                os.remove(f)
 
 thresh = 1550
+folder = os.getcwd()
+output_folder = f'{folder}/output'
+os.mkdir(output_folder)
+name = 'xxFLYxx'
 
-# folder = '/home/lab/Documents/all_vids/HD_vids'
+segment_video(folder, threshold = thresh, output = output_folder, typ = name)
 
-# file_list = []
-# for filename in os.listdir(folder):
-#     f = os.path.join(folder, filename)
-#     if '_WT' in f or '_CS' in f:
-#         file_list.append(f)
-
-# output_folder = '/home/lab/Desktop/video_processing/data/processed_video/mobile'
-# # haven't done /home/lab/Documents/all_vids/HD_vids/04_05_2023_CS2
-# for file in file_list:
-#     if '_WT' in file:
-#         typ = 'WC4'
-#     else:
-#         typ = 'CS'
-#     print(f'Starting {file}')
-#     file_count = 1
-
-file = '/home/lab/Documents/test_vids'
-file_count = 1
-for vid in os.listdir(file):
-    v = os.path.join(file, vid)
-    print(f'Segmenting {file_count} of {len(os.listdir(file))}')
-    file_count +=1
-    try:
-        segment_video(v, threshold = thresh, output = '/home/lab/Documents/output', typ = 'clss')
-    except:
-        print(f'Error: {v}')
-        continue
-# for vid in os.listdir(output_folder):
-#     v = os.path.join(output_folder, vid)
-#     get_vid_length(v)
-
-# The specific methods we'll be using from the OpenCV package are:
-
-# cv2.VideoCapture(): This function creates a VideoCapture object that can be used to read frames from a video file.
-
-# cv2.absdiff(): This function calculates the absolute difference between two frames.
-
-# cv2.cvtColor(): This function converts a color image from one color space to another. We'll use it to convert the difference image to grayscale.
-
-# cv2.GaussianBlur(): This function applies a Gaussian filter to an image to reduce noise.
-
-# cv2.threshold(): This function applies a threshold to an image to convert it to a binary image.
-
-# cv2.countNonZero(): This function counts the number of non-zero pixels in a binary image.
+get_vid_length(output_folder)
